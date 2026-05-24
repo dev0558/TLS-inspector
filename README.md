@@ -60,26 +60,6 @@ TLS.INSPECTOR is built for the gap in the middle: a self-hosted, audit-friendly,
 - **Docker-ready** — single `docker compose up -d` to deploy
 - **Dark operator UI** — JetBrains Mono + Space Grotesk typography, tactical-console aesthetic
 
-## Screenshots
-
-Scan interface with form-first layout and quick-target buttons:
-
-![Scan interface](docs/screenshots/01_home_scan.png)
-
-Report view with overall grade and severity counts:
-
-![Report view](docs/screenshots/02_report_grade.png)
-
-Severity-graded findings list:
-
-![Findings](docs/screenshots/03_findings_list.png)
-
-Leaf certificate detail and protocol matrix:
-
-![Certificate detail](docs/screenshots/04_leaf_certificate.png)
-
-> Drop your screenshots in `docs/screenshots/` after cloning, or remove this section if you prefer.
-
 ## Quick Start
 
 ### Docker (recommended)
