@@ -1,0 +1,223 @@
+{% extends "base.html" %}
+{% block title %}TLS.INSPECTOR :: {{ report.host }}{% endblock %}
+
+{% block content %}
+<section class="section">
+  <div class="container">
+
+    <header class="report-head">
+      <div class="report-meta">
+        <span class="tag">// REPORT</span>
+        <span>{{ report.started|nice_dt }}</span>
+        <span>[{{ report.elapsed_ms }}ms]</span>
+      </div>
+      <h1 class="report-host">{{ report.host }}<span class="rh-port">:{{ report.port }}</span></h1>
+      {% if report.ip %}<div class="report-ip">resolved &rarr; {{ report.ip }}</div>{% endif %}
+      <div class="report-actions">
+        <a class="btn btn-ghost" href="{{ url_for('index') }}">[ NEW SCAN ]</a>
+      </div>
+    </header>
+
+    {% if report.error %}
+      <div class="alert">
+        <strong>SCAN FAILED</strong><br>
+        {{ report.error }}
+      </div>
+    {% else %}
+
+    <!-- Grade panel -->
+    <div class="grade-panel">
+      <div class="grade-block">
+        <div class="grade-letter {{ report.grade|grade_class }}">{{ report.grade }}</div>
+        <div class="grade-label">OVERALL</div>
+      </div>
+      <div class="severity-bar">
+        {% set sc = report.severity_counts %}
+        <div class="sev-pill sev-critical"><span class="sp-n">{{ sc.CRITICAL }}</span><span class="sp-l">CRITICAL</span></div>
+        <div class="sev-pill sev-high"><span class="sp-n">{{ sc.HIGH }}</span><span class="sp-l">HIGH</span></div>
+        <div class="sev-pill sev-medium"><span class="sp-n">{{ sc.MEDIUM }}</span><span class="sp-l">MEDIUM</span></div>
+        <div class="sev-pill sev-low"><span class="sp-n">{{ sc.LOW }}</span><span class="sp-l">LOW</span></div>
+        <div class="sev-pill sev-info"><span class="sp-n">{{ sc.INFO }}</span><span class="sp-l">INFO</span></div>
+      </div>
+    </div>
+
+    <!-- Findings -->
+    <section class="panel">
+      <header class="panel-head">
+        <h2>:: FINDINGS ::</h2>
+        <span class="panel-link">{{ report.findings|length }} TOTAL</span>
+      </header>
+      {% if report.findings %}
+        <ol class="findings">
+          {% for f in report.findings %}
+          <li class="finding {{ f.severity|sev_class }}">
+            <span class="f-sev">{{ f.severity }}</span>
+            <span class="f-msg">{{ f.message }}</span>
+            <span class="f-cat">{{ f.category }}</span>
+          </li>
+          {% endfor %}
+        </ol>
+      {% else %}
+        <div class="panel-body"><p class="empty">// no findings &mdash; clean configuration</p></div>
+      {% endif %}
+    </section>
+
+    <!-- Leaf cert + Connection -->
+    <div class="grid-2">
+      <section class="panel">
+        <header class="panel-head"><h2>:: LEAF CERTIFICATE ::</h2></header>
+        <div class="panel-body">
+          {% set c = report.certificate %}
+          <dl class="kv">
+            <dt>Subject</dt><dd>{{ c.subject|commonname }}{% if c.subject.organizationName %} &middot; {{ c.subject.organizationName }}{% endif %}</dd>
+            <dt>Issuer</dt><dd>{{ c.issuer|commonname }}{% if c.issuer.organizationName %} &middot; {{ c.issuer.organizationName }}{% endif %}</dd>
+            <dt>Serial</dt><dd class="mono">{{ c.serial }}</dd>
+            <dt>SHA-256</dt><dd class="mono small">{{ c.fingerprint_sha256 }}</dd>
+            <dt>Valid From</dt><dd>{{ c.valid_from|nice_dt }}</dd>
+            <dt>Valid Until</dt><dd>{{ c.valid_until|nice_dt }}{% if c.days_until_expiry is defined %} <em class="dim">({{ c.days_until_expiry }}d left)</em>{% endif %}</dd>
+            <dt>Lifetime</dt><dd>{{ c.lifetime_days }} days</dd>
+            <dt>Signature</dt><dd>{{ c.signature_algorithm }}</dd>
+            <dt>Public Key</dt><dd>{{ c.public_key.type }}{% if c.public_key.size %} / {{ c.public_key.size }} bits{% endif %}{% if c.public_key.curve %} / {{ c.public_key.curve }}{% endif %}</dd>
+            <dt>OCSP Stapled</dt><dd>{{ "yes" if report.ocsp_stapled else "no" }}</dd>
+            {% if c.san %}
+            <dt>SAN ({{ c.san|length }})</dt>
+            <dd>
+              <div class="san-list">{% for s in c.san %}<span class="san-pill">{{ s }}</span>{% endfor %}</div>
+            </dd>
+            {% endif %}
+          </dl>
+        </div>
+      </section>
+
+      <section class="panel">
+        <header class="panel-head"><h2>:: CONNECTION ::</h2></header>
+        <div class="panel-body">
+          <dl class="kv">
+            <dt>TLS Version</dt><dd><span class="badge">{{ report.tls_version }}</span></dd>
+            <dt>Cipher</dt><dd class="mono">{{ report.cipher.name }} ({{ report.cipher.bits }} bits)</dd>
+          </dl>
+          {% if report.protocols %}
+          <h3 class="sub-head">:: PROTOCOL MATRIX ::</h3>
+          <div class="proto-grid">
+            {% for v in ['TLSv1.3','TLSv1.2','TLSv1.1','TLSv1'] %}
+            <div class="proto {% if v in report.protocols.supported %}on{% else %}off{% endif %}">
+              <span>{{ v }}</span>
+              <em>{{ "ENABLED" if v in report.protocols.supported else "—" }}</em>
+            </div>
+            {% endfor %}
+          </div>
+          {% endif %}
+
+          {% if report.ciphers %}
+          <h3 class="sub-head">:: CIPHER ENUMERATION ::</h3>
+          <p class="dim mono small">TLS 1.3 supported: <strong>{{ report.ciphers.tls13_supported|length }}</strong> &middot; TLS 1.2 supported: <strong>{{ report.ciphers.tls12_supported|length }}</strong></p>
+          {% if report.ciphers.weak_supported %}
+            <p class="dim mono small">Weak: <code>{{ report.ciphers.weak_supported|join(", ") }}</code></p>
+          {% endif %}
+          {% endif %}
+        </div>
+      </section>
+    </div>
+
+    {% if report.chain and report.chain.certs %}
+    <section class="panel">
+      <header class="panel-head"><h2>:: CERTIFICATE CHAIN ({{ report.chain.certs|length }}) ::</h2></header>
+      <div class="chain">
+        {% for c in report.chain.certs %}
+        <article class="chain-cert pos-{{ c.position }}">
+          <header>
+            <span class="cc-pos">{{ c.position|upper }}</span>
+            <span class="cc-idx">#{{ c.index }}</span>
+          </header>
+          <h4>{{ c.subject_cn or "(no CN)" }}</h4>
+          {% if c.subject_o %}<p class="dim mono small" style="margin: 4px 0 0;">{{ c.subject_o }}</p>{% endif %}
+          <p class="dim mono small" style="margin: 4px 0 0;">Issued by: {{ c.issuer_cn or "(no CN)" }}</p>
+          <p class="dim mono small" style="margin: 4px 0 0;">{{ c.valid_from|nice_dt }} &rarr; {{ c.valid_until|nice_dt }}</p>
+          <p class="dim mono small" style="margin: 4px 0 0;">{{ c.fingerprint_sha256[:48] }}&hellip;</p>
+        </article>
+        {% endfor %}
+      </div>
+    </section>
+    {% endif %}
+
+    {% if report.http_headers %}
+    <section class="panel">
+      <header class="panel-head"><h2>:: HTTP SECURITY HEADERS ::</h2></header>
+      {% if report.http_headers.status %}<div class="panel-body"><p class="dim mono small">{{ report.http_headers.status }}</p></div>{% endif %}
+      {% if report.http_headers.headers %}
+      <table class="kvt">
+        {% for k, v in report.http_headers.headers.items() %}
+        <tr><th>{{ k }}</th><td class="mono">{{ v }}</td></tr>
+        {% endfor %}
+      </table>
+      {% else %}
+      <div class="panel-body"><p class="dim">// no headers retrieved</p></div>
+      {% endif %}
+    </section>
+    {% endif %}
+
+    {% if report.dns %}
+    <section class="panel">
+      <header class="panel-head"><h2>:: DNS POSTURE ::</h2></header>
+      <div class="panel-body">
+        <div class="dns-grid">
+          {% for rrtype in ['A','AAAA','MX','NS','CAA','TXT'] %}
+            {% set vals = report.dns.get(rrtype, []) %}
+            <div class="dns-block">
+              <h4>{{ rrtype }}</h4>
+              {% if vals %}
+                {% for v in vals %}<div class="mono small">{{ v }}</div>{% endfor %}
+              {% else %}
+                <span class="dim">—</span>
+              {% endif %}
+            </div>
+          {% endfor %}
+        </div>
+      </div>
+    </section>
+    {% endif %}
+
+    {% if report.ports %}
+    <section class="panel">
+      <header class="panel-head"><h2>:: PORT SWEEP ::</h2></header>
+      <div class="panel-body">
+        <div class="ports">
+          {% for p in report.ports %}
+          <div class="port {% if p.tls %}on{% elif p.tcp %}half{% else %}off{% endif %}">
+            <span class="p-port">{{ p.port }}</span>
+            <span class="p-svc">{{ p.service }}</span>
+            <span class="p-status">
+              {% if p.tls %}TLS {{ p.tls_version }}
+              {% elif p.tcp %}TCP only
+              {% else %}closed{% endif %}
+            </span>
+          </div>
+          {% endfor %}
+        </div>
+      </div>
+    </section>
+    {% endif %}
+
+    {% if report.ct_logs and report.ct_logs.entries %}
+    <section class="panel">
+      <header class="panel-head"><h2>:: CT LOGS ({{ report.ct_logs.total }} TOTAL) ::</h2></header>
+      <table class="kvt small">
+        <thead><tr><th>Issuer</th><th>Common Name</th><th>Not Before</th><th>Not After</th></tr></thead>
+        <tbody>
+          {% for e in report.ct_logs.entries %}
+          <tr>
+            <td>{{ e.issuer }}</td>
+            <td class="mono">{{ e.common_name }}</td>
+            <td>{{ e.not_before }}</td>
+            <td>{{ e.not_after }}</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </section>
+    {% endif %}
+
+    {% endif %}
+  </div>
+</section>
+{% endblock %}

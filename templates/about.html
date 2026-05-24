@@ -1,0 +1,184 @@
+{% extends "base.html" %}
+{% block title %}TLS.INSPECTOR :: API{% endblock %}
+
+{% block content %}
+<section class="section">
+  <div class="container">
+    <span class="eyebrow">03 // AUTOMATION FIRST</span>
+    <h1 class="section-title">Built for automation.</h1>
+    <p class="section-sub">
+      Everything in the GUI is exposed via a streamlined POST API. Integrate scans
+      into webhook chains, CI/CD runners, or custom SOAR playbooks. Returns standardized
+      JSON. No authentication required on local instances.
+    </p>
+
+    <div class="grid-2" style="margin-top: 36px; align-items: start;">
+      <!-- Left: copy + endpoints -->
+      <div>
+        <h3 class="sub-head" style="margin-top: 0;">:: ENDPOINTS ::</h3>
+
+        <div class="code-panel">
+          <header class="code-panel-head">
+            <span><span class="tag">POST</span> /api/scan</span>
+            <span>SINGLE TARGET</span>
+          </header>
+          <pre class="code">curl -X POST http://localhost:5000/api/scan \
+  -H 'Content-Type: application/json' \
+  -d '{
+    "host": "example.com",
+    "port": 443,
+    "options": {
+      "chain":     true,
+      "protocols": true,
+      "ciphers":   false,
+      "headers":   true,
+      "ct":        false,
+      "dns":       true,
+      "ports":     false
+    }
+  }'</pre>
+        </div>
+
+        <div class="code-panel">
+          <header class="code-panel-head">
+            <span><span class="tag">POST</span> /api/scan/bulk</span>
+            <span>UP TO 25 HOSTS</span>
+          </header>
+          <pre class="code">curl -X POST http://localhost:5000/api/scan/bulk \
+  -H 'Content-Type: application/json' \
+  -d '{
+    "hosts": ["example.com", "github.com", "cloudflare.com"],
+    "options": { "headers": true, "chain": true }
+  }'</pre>
+        </div>
+
+        <div class="code-panel">
+          <header class="code-panel-head">
+            <span><span class="tag">GET</span> /report/&lt;id&gt;.json</span>
+            <span>DOWNLOAD</span>
+          </header>
+          <pre class="code">curl http://localhost:5000/report/abc123.json \
+  > scan-report.json</pre>
+        </div>
+
+        <div class="code-panel">
+          <header class="code-panel-head">
+            <span><span class="tag">GET</span> /healthz</span>
+            <span>LIVENESS</span>
+          </header>
+          <pre class="code">curl http://localhost:5000/healthz
+# {"status":"ok","time":"2026-05-24T..."}</pre>
+        </div>
+      </div>
+
+      <!-- Right: response schema -->
+      <div>
+        <h3 class="sub-head" style="margin-top: 0;">:: RESPONSE SCHEMA ::</h3>
+        <div class="code-panel json">
+          <header class="code-panel-head">
+            <span>OBJECT OUTPUT SCHEMA (JSON)</span>
+            <span class="tag">200 OK</span>
+          </header>
+          <pre class="code">{
+  "host": "example.com",
+  "port": 443,
+  "ip":   "93.184.216.34",
+  "grade": "A",
+  "elapsed_ms": 1284,
+
+  "severity_counts": {
+    "CRITICAL": 0, "HIGH": 0,
+    "MEDIUM":   1, "LOW":  0, "INFO": 0
+  },
+
+  "findings": [
+    {
+      "severity": "MEDIUM",
+      "category": "config",
+      "message":  "Lifetime over 398d"
+    }
+  ],
+
+  "certificate": {
+    "subject": { "commonName": "example.com" },
+    "issuer":  { "commonName": "DigiCert" },
+    "san":     ["example.com", "www.example.com"],
+    "valid_from":  "2026-01-01T00:00:00+00:00",
+    "valid_until": "2027-01-01T00:00:00+00:00",
+    "signature_algorithm": "sha256",
+    "public_key": { "type": "RSA", "size": 2048 }
+  },
+
+  "chain":        { "certs": [...] },
+  "protocols":    { "supported": ["TLSv1.3","TLSv1.2"] },
+  "ciphers":      { "tls13_supported": [...] },
+  "http_headers": { "headers": { ... } },
+  "dns":          { "A": [...], "CAA": [...] },
+  "ct_logs":      { "total": 142, "entries": [...] },
+  "ports":        [ { "port": 443, "tls": true } ]
+}</pre>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- DEPLOY SECTION -->
+<section class="section">
+  <div class="container">
+    <span class="eyebrow">04 // SELF-HOST</span>
+    <h2 class="section-title">Runs in your network. No telemetry.</h2>
+    <p class="section-sub">
+      Your target endpoints stay yours. TLS.INSPECTOR ships zero analytics, stores
+      no scan history beyond the in-memory deque, and operates offline inside
+      firewalled subnets.
+    </p>
+
+    <div class="grid-2" style="margin-top: 36px; align-items: start;">
+      <div>
+        <h3 class="sub-head" style="margin-top: 0;">:: DOCKER ::</h3>
+        <div class="code-panel">
+          <header class="code-panel-head">
+            <span>docker-compose.yml</span>
+            <span class="tag">RECOMMENDED</span>
+          </header>
+          <pre class="code">services:
+  tls-inspector:
+    build: .
+    ports:
+      - "5000:5000"
+    restart: unless-stopped</pre>
+        </div>
+        <div class="code-panel">
+          <header class="code-panel-head">
+            <span>DEPLOY COMMAND</span>
+            <span class="tag">ONE-LINER</span>
+          </header>
+          <pre class="code">docker compose up -d</pre>
+        </div>
+      </div>
+
+      <div>
+        <h3 class="sub-head" style="margin-top: 0;">:: LOCAL PYTHON ::</h3>
+        <div class="code-panel">
+          <header class="code-panel-head">
+            <span>setup</span>
+            <span class="tag">DEV</span>
+          </header>
+          <pre class="code">python -m venv .venv
+source .venv/bin/activate
+pip install -r requirements.txt
+python app.py</pre>
+        </div>
+        <div class="code-panel">
+          <header class="code-panel-head">
+            <span>PORT OVERRIDE</span>
+            <span class="tag">macOS AIRPLAY</span>
+          </header>
+          <pre class="code">PORT=8000 python app.py</pre>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+{% endblock %}

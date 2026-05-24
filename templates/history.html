@@ -1,0 +1,40 @@
+{% extends "base.html" %}
+{% block title %}TLS.INSPECTOR :: HISTORY{% endblock %}
+
+{% block content %}
+<section class="section">
+  <div class="container">
+    <span class="eyebrow">02 // SCAN ARCHIVE</span>
+    <h1 class="section-title">Recent recon, last {{ history|length }} runs.</h1>
+    <p class="section-sub">
+      Scan history is held in memory (deque, last 50). Restart wipes the archive.
+      Wire in SQLite or Postgres for persistence.
+    </p>
+
+    {% if not history %}
+      <div class="panel" style="margin-top: 28px;">
+        <div class="panel-body">
+          <p class="empty">// no scans yet &mdash; run one from the home page</p>
+        </div>
+      </div>
+    {% else %}
+    <section class="panel" style="margin-top: 28px;">
+      <div class="history-list">
+        {% for h in history %}
+        <a class="history-item" href="{{ url_for('view_report', rid=h.id) }}">
+          <span class="hi-grade {{ h.grade|grade_class }}">{{ h.grade }}</span>
+          <span class="hi-host">{{ h.host }}:{{ h.port }}</span>
+          <span class="hi-counts">
+            {% for sev, n in h.severity_counts.items() if n %}
+              <em class="{{ sev|sev_class }}">{{ sev[:1] }}{{ n }}</em>
+            {% endfor %}
+          </span>
+          <span class="hi-time">{{ h.started|nice_dt }}</span>
+        </a>
+        {% endfor %}
+      </div>
+    </section>
+    {% endif %}
+  </div>
+</section>
+{% endblock %}

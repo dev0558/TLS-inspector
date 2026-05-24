@@ -1,0 +1,14 @@
+services:
+  ssl-inspector:
+    build: .
+    container_name: ssl-inspector
+    ports:
+      - "5000:5000"
+    restart: unless-stopped
+    environment:
+      - FLASK_DEBUG=
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:5000/healthz', timeout=3)"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
